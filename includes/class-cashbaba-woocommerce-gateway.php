@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
+
 class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
 {
 
@@ -44,16 +48,27 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
 
         // This action hook saves the settings
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-        add_action( 'woocommerce_api_wc_cashbaba', array( $this, 'check_cashbaba_response' ), 10, 0 );
+        add_action( 'woocommerce_api_'.$this->id, array( $this, 'check_cashbaba_response' ) );
         add_action('woocommerce_receipt_cashbaba', array($this, 'receipt_page'));
+      //  add_action( 'woocommerce_thankyou_cashbaba', array( $this, 'thankyou_page' ) );
 
         $this->validate_settings();
 
     }
 
-    public function check_cashbaba_response() {
+
+
+    public function check_cashbaba_response(){
         $response_data = $_POST;
-       // self::log(json_encode($response_data));
+        $response_data1 = $_GET;
+
+        self::log(json_encode("tapos"));
+        self::log(json_encode($response_data));
+        self::log(json_encode($response_data1));
+       // self::log($order_id . "my order information");
+
+        die();
+
     }
 
 
@@ -160,13 +175,13 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
     {
         $order = (0 === $order_id) ? false : new WC_Order($order_id);
         $isTestEnvironment = ('yes' === $this->get_option( 'testmode', 'no' ));
-
+        $callback  = add_query_arg('wc-api', $this->id, home_url('/'));
         $config = array(
             'client_id' => $isTestEnvironment ? $this->get_option('test_client_id') : $this->get_option('live_client_id')  ,
             'client_secret' => $isTestEnvironment ? $this->get_option('test_client_secret') : $this->get_option('live_client_secret') ,
             'merchant_id' => $isTestEnvironment ? $this->get_option('test_merchant_id') : $this->get_option('live_merchant_id') ,
             'customer_id' => $isTestEnvironment ? $this->get_option('test_customer_id') : $this->get_option('live_customer_id')  ,
-            'return_url' => ($order) ? $order->get_checkout_order_received_url() : get_home_url(),
+            'return_url' => $callback,
             'gatewayUrl' => $isTestEnvironment ? self::GATEWAY_SANDBOX_URL : self::GATEWAY_URL  ,
 
         );
@@ -187,36 +202,30 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-cashbaba-woocommerce-request.php';
         $api_request = new Cashbaba_Wocommerce_Api_Request($this->get_config($order_id),$this );
 
-        $api_request->create_checkout($order_id);
+        $checkout_response = $api_request->create_checkout($order_id);
 
         echo '<p>' . __('Thank you for your order, please click the button below to pay with Alipay.', 'alipay') . '</p>';
 
-       // echo $this->generate_cashbaba_form($order);
+        echo $this->generate_cashbaba_form($order_id,$checkout_response);
     }
 
 
 
 
-    function generate_cashbaba_form($order_id)
+    function generate_cashbaba_form($order_id,$checkout_response)
     {
 
-        $order = new WC_Order($order_id);
-//        require_once( "lib/alipay_submit.class.php");
-//
-//        $alipay_args    = $this->get_alipay_args( $order );
-//        $alipay_config  = $this->get_alipay_config();
-//        $alipaySubmit   = new AlipaySubmit( $alipay_config );
-//        $alipay_adr     = $alipaySubmit->alipay_gateway_new;
-//        $para           = $alipaySubmit->buildRequestPara($alipay_args, $alipay_config);
-
+        $this->log($checkout_response);
         $alipay_args_array = array();
-//        foreach ($para as $key => $value) {
-//            $alipay_args_array[] = '<input type="hidden" name="' . esc_attr($key) . '" value="' . esc_attr($value) . '" />';
-//        }
+        $alipay_args_array[] = '<input type="hidden" name="' . esc_attr("orderId") . '" value="' . esc_attr($checkout_response['orderId']) . '" />';
+        $alipay_args_array[] = '<input type="hidden" name="' . esc_attr("referenceId") . '" value="' . esc_attr($checkout_response['referenceId']) . '" />';
+        $alipay_args_array[] = '<input type="hidden" name="' . esc_attr("paymentId") . '" value="' . esc_attr($checkout_response['paymentId']) . '" />';
+
+
 
         wc_enqueue_js('
             $.blockUI({
-                    message: "' . esc_js(__('Thank you for your order. We are now redirecting you to Alipay to make payment.', 'alipay')) . '",
+                    message: "' . esc_js(__('Thank you for your order. We are now redirecting you to CashBaba to make payment.', 'alipay')) . '",
                     baseZ: 99999,
                     overlayCSS:
                     {
@@ -237,10 +246,10 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
             jQuery("#submit_alipay_payment_form").click();
         ');
 
-        return '<form id="alipaysubmit" name="alipaysubmit" action="https://google.com" method="post" target="_top">' . implode('', $alipay_args_array) . '
+        return '<form id="alipaysubmit" name="alipaysubmit" action="' . $checkout_response['cashBabaUrl'] .  '" method="post" target="_top">' . implode('', $alipay_args_array) . '
                     <!-- Button Fallback -->
                     <div class="payment_buttons">
-                        <input type="submit" class="button-alt" id="submit_alipay_payment_form" value="' . __('Pay via Alipay', 'alipay') . '" /> <a class="button cancel" href="' . esc_url($order->get_cancel_order_url()) . '">' . __('Cancel order &amp; restore cart', 'alipay') . '</a>
+                        <input type="submit" class="button-alt" id="submit_alipay_payment_form" value="Pay via CashBaba" /> 
                     </div>
                     <script type="text/javascript">
                         jQuery(".payment_buttons").hide();
