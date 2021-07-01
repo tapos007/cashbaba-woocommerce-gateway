@@ -1,29 +1,32 @@
 <?php
 
-class Cashbaba_Wocommerce_Gateway  extends WC_Payment_Gateway
+class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
 {
 
-    private $allowedCurrencies = array(
-        'SEK', 'EUR', 'NOK', 'USD', 'CLP'
-    );
-    private const SUCCESS_CALLBACK_URL = "cashbaba/sucess";
-    private const FAILURE_CALLBACK_URL = "cashbaba/failure";
-    private const TEST_URL = "http://localhost:5000/api/v1/";
-    private const  PRODUCTION_URL = "https://api.cashbaba.com.bd/api/v1/";
-    private $backendApplicationUrl;
-    private const SUCCESS_REDIRECT_URL = "/checkout/order-received/";
-    private const FAILURE_REDIRECT_URL = "/checkout/order-received/";
+
+    const GATEWAY_URL = 'https://dev.cash-baba.com:11443/api/v1';
+    const GATEWAY_SANDBOX_URL = 'https://dev.cash-baba.com:11443/api/v1';
+    const GATEWAY_ID = 'cashbaba';
+    protected static $log_enabled = false;
+    protected static $log = false;
+    protected $current_currency;
+    protected $supported_currencies;
     private $table = 'cashbaba_transactions';
+
     public function __construct()
     {
-        $this->id = 'cashbaba'; // payment gateway plugin ID
+        $this->id = self::GATEWAY_ID; // payment gateway plugin ID
+        $this->has_fields = false; // in case you need a custom credit card form
         $this->icon = ''; // URL of the icon that will be displayed on checkout page near your gateway name
-        $this->has_fields = true; // in case you need a custom credit card form
         $this->method_title = 'CashBaba Payment Gateway';
         $this->method_description = 'Description of CashBaba payment gateway'; // will be displayed on the options page
-        $title                    = $this->get_option('title');
-        $this->title              = empty($title) ? 'CashBaba' : $title;
-        $this->description        = $this->get_option('description');
+        $title = $this->get_option('title');
+        $this->title = empty($title) ? 'CashBaba' : $title;
+        $this->description = $this->get_option('description');
+        $this->order_button_text = __('Pay with CashBaba', 'woo-alipay');
+        $this->current_currency = get_option('woocommerce_currency');
+        $this->supported_currencies = array('BDT');
+        $this->form_submission_method = true;
 
         // gateways can support subscriptions, refunds, saved payment methods,
         // but in this tutorial we begin with simple payments
@@ -37,239 +40,235 @@ class Cashbaba_Wocommerce_Gateway  extends WC_Payment_Gateway
         // Load the settings.
         $this->init_settings();
 
-
-        $this->siteUrl = get_site_url();
-
-        if ($this->get_option('test_mode')) {
-            $this->backendApplicationUrl = self::TEST_URL;
-        } else {
-            $this->backendApplicationUrl = self::PRODUCTION_URL;
-        }
-
+        self::$log_enabled = ('yes' === $this->get_option('debug', 'no'));
 
         // This action hook saves the settings
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-        add_action('woocommerce_api_' . self::SUCCESS_CALLBACK_URL, array($this, 'payment_success'));
-        add_action('woocommerce_api_' . self::FAILURE_CALLBACK_URL, array($this, 'payment_failure'));
-        add_action('wp_enqueue_scripts', array($this, 'payment_scripts'));
+        add_action( 'woocommerce_api_wc_cashbaba', array( $this, 'check_cashbaba_response' ), 10, 0 );
+        add_action('woocommerce_receipt_cashbaba', array($this, 'receipt_page'));
+
+        $this->validate_settings();
+
     }
+
+    public function check_cashbaba_response() {
+        $response_data = $_POST;
+       // self::log(json_encode($response_data));
+    }
+
+
+    /**
+     * method  for writing log
+     */
+    public static function log($message, $level = 'info', $force = false)
+    {
+
+        if (self::$log_enabled || $force) {
+
+            if (empty(self::$log)) {
+                self::$log = wc_get_logger();
+            }
+
+            self::$log->log($level, $message, array('source' => self::GATEWAY_ID));
+        }
+    }
+
+    /**
+     * method  for validation check
+     */
+    public function validate_settings()
+    {
+        $valid = true;
+
+        if ($this->requires_exchange_rate()) {
+            add_action('admin_notices', array($this, 'missing_exchange_rate_notice'), 10, 0);
+
+            $valid = false;
+        }
+
+        return $valid;
+    }
+
+    /**
+     * method  for exchange rate calculation
+     */
+    public function requires_exchange_rate()
+    {
+
+        return (!in_array($this->current_currency, $this->supported_currencies, true));
+    }
+
+    /**
+     * method  for exchange rate notice
+     */
+    public function missing_exchange_rate_notice()
+    {
+        $message = __('CashBaba is enabled, but the store currency is not set to Bangladeshi BDT.', 'cashbaba-woocommerce');
+        // translators: %1$s is the URL of the link and %2$s is the currency name
+        $message .= __(' Please <a href="%1$s">set the %2$s against the Bangladeshi BDT</a>.', 'woo-alipay');
+
+        $page = 'admin.php?page=wc-settings&tab=checkout&section=wc_cashbaba#woocommerce_cashbaba_exchange_rate';
+        $url = admin_url($page);
+
+        echo '<div class="error"><p>' . sprintf($message, $url, $this->current_currency . '</p></div>'); // WPCS: XSS OK
+    }
+
+    /**
+     * method  for availability check
+     */
+
+    public function is_available()
+    {
+        $is_available = ('yes' === $this->enabled) ? true : false;
+
+        if (!in_array(get_woocommerce_currency(), $this->supported_currencies, true)
+        ) {
+            $is_available = false;
+        }
+
+        return $is_available;
+    }
+
+    /**
+     * process admin options
+     */
+    public function process_admin_options()
+    {
+        $saved = parent::process_admin_options();
+
+        if ('yes' !== $this->get_option('debug', 'no')) {
+
+            if (empty(self::$log)) {
+                self::$log = wc_get_logger();
+            }
+
+            self::$log->clear(self::GATEWAY_ID);
+        }
+
+
+        return $saved;
+    }
+
+
     public function init_form_fields()
     {
+        $this->form_fields = require plugin_dir_path(dirname(__FILE__)) . 'admin/settings-cashbaba.php';
+    }
 
-        $this->form_fields = array(
-            'enabled'     => array(
-                'title'   => 'Enable/Disable',
-                'type'    => 'checkbox',
-                'label'   => 'Enable CashBaba Gateway',
-                'default' => 'yes',
-                'required'    => TRUE,
-            ),
-            'test_mode'   => array(
-                'title'   => 'Test Mode',
-                'required'    => TRUE,
-                'type'    => 'select',
-                'options' => ["on" => "ON", "off" => "OFF"],
-                'default' => 'on',
-            ),
-            'title'       => array(
-                'title'   => 'Title',
-                'required'    => true,
-                'type'    => 'text',
-                'default' => 'cashbaba Payment',
-            ),
-            'client_id'    => array(
-                'title' => 'Client Id',
-                'required'    => true,
-                'type'  => 'text',
-            ),
-            'client_secret'    => array(
-                'title' => 'Client Secret',
-                'required'    => true,
-                'type'  => 'text',
-            ),
-            'success_call_back'    => array(
-                'title' => 'Success CallBack',
-                'required'    => true,
-                'type'  => 'text',
-                'default' => get_site_url() . "/wc-api/" . self::SUCCESS_CALLBACK_URL,
-            ),
-            'error_call_back'    => array(
-                'title' => 'Success CallBack',
-                'required'    => true,
-                'type'  => 'text',
-                'default' => get_site_url() . "/wc-api/" . self::FAILURE_CALLBACK_URL,
-            ),
-            'description' => array(
-                'title'       => 'Description',
-                'type'        => 'textarea',
-                'description' => 'Payment method description that the customer will see on your checkout.',
-                'default'     => 'Pay via CashBaba',
-                'desc_tip'    => true,
-            ),
+
+    protected function get_config($order_id = 0)
+    {
+        $order = (0 === $order_id) ? false : new WC_Order($order_id);
+        $isTestEnvironment = ('yes' === $this->get_option( 'testmode', 'no' ));
+
+        $config = array(
+            'client_id' => $isTestEnvironment ? $this->get_option('test_client_id') : $this->get_option('live_client_id')  ,
+            'client_secret' => $isTestEnvironment ? $this->get_option('test_client_secret') : $this->get_option('live_client_secret') ,
+            'merchant_id' => $isTestEnvironment ? $this->get_option('test_merchant_id') : $this->get_option('live_merchant_id') ,
+            'customer_id' => $isTestEnvironment ? $this->get_option('test_customer_id') : $this->get_option('live_customer_id')  ,
+            'return_url' => ($order) ? $order->get_checkout_order_received_url() : get_home_url(),
+            'gatewayUrl' => $isTestEnvironment ? self::GATEWAY_SANDBOX_URL : self::GATEWAY_URL  ,
+
         );
+
+        return $config;
+    }
+
+    /**
+     * Output for the order received page.
+     *
+     * @access public
+     * @return void
+     */
+    function receipt_page($order_id)
+    {
+
+
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-cashbaba-woocommerce-request.php';
+        $api_request = new Cashbaba_Wocommerce_Api_Request($this->get_config($order_id),$this );
+
+        $api_request->create_checkout($order_id);
+
+        echo '<p>' . __('Thank you for your order, please click the button below to pay with Alipay.', 'alipay') . '</p>';
+
+       // echo $this->generate_cashbaba_form($order);
     }
 
 
-    public function payment_fields()
+
+
+    function generate_cashbaba_form($order_id)
     {
+
+        $order = new WC_Order($order_id);
+//        require_once( "lib/alipay_submit.class.php");
+//
+//        $alipay_args    = $this->get_alipay_args( $order );
+//        $alipay_config  = $this->get_alipay_config();
+//        $alipaySubmit   = new AlipaySubmit( $alipay_config );
+//        $alipay_adr     = $alipaySubmit->alipay_gateway_new;
+//        $para           = $alipaySubmit->buildRequestPara($alipay_args, $alipay_config);
+
+        $alipay_args_array = array();
+//        foreach ($para as $key => $value) {
+//            $alipay_args_array[] = '<input type="hidden" name="' . esc_attr($key) . '" value="' . esc_attr($value) . '" />';
+//        }
+
+        wc_enqueue_js('
+            $.blockUI({
+                    message: "' . esc_js(__('Thank you for your order. We are now redirecting you to Alipay to make payment.', 'alipay')) . '",
+                    baseZ: 99999,
+                    overlayCSS:
+                    {
+                        background: "#fff",
+                        opacity: 0.6
+                    },
+                    css: {
+                        padding:        "20px",
+                        zindex:         "9999999",
+                        textAlign:      "center",
+                        color:          "#555",
+                        border:         "3px solid #aaa",
+                        backgroundColor:"#fff",
+                        cursor:         "wait",
+                        lineHeight:     "24px",
+                    }
+                });
+            jQuery("#submit_alipay_payment_form").click();
+        ');
+
+        return '<form id="alipaysubmit" name="alipaysubmit" action="https://google.com" method="post" target="_top">' . implode('', $alipay_args_array) . '
+                    <!-- Button Fallback -->
+                    <div class="payment_buttons">
+                        <input type="submit" class="button-alt" id="submit_alipay_payment_form" value="' . __('Pay via Alipay', 'alipay') . '" /> <a class="button cancel" href="' . esc_url($order->get_cancel_order_url()) . '">' . __('Cancel order &amp; restore cart', 'alipay') . '</a>
+                    </div>
+                    <script type="text/javascript">
+                        jQuery(".payment_buttons").hide();
+                    </script>
+                </form>';
     }
-    public function payment_scripts()
-    {
-    }
-    public function validate_fields()
-    {
-    }
+
+
     public function process_payment($order_id)
     {
 
-        $token = $this->get_token();
-        global $woocommerce;
+        $order = new WC_Order($order_id);
 
-        //To receive order id 
-        $order = wc_get_order($order_id);
 
-        //To receive order amount
-        $amount = $order->get_total();
-
-        $requestBody = array(
-            'currency' => "BDT",
-            'amount' => $amount,
-            'intent' => 'sale',
-            'merchantInvoiceNumber' => $order_id
+        return array(
+            'result' => 'success',
+            'redirect' => $order->get_checkout_payment_url(true)
         );
-
-        wc_add_notice(json_encode($requestBody), 'error');
-
-
-        $header = array(
-            'Authorization' => "Bearer " . $token,
-            'Content-Type' => 'application/json'
-        );
-
-        $args = array(
-            'method' => 'POST',
-            'headers' => $header,
-            'body' => json_encode($requestBody),
-        );
-
-        $apiUrl = $this->backendApplicationUrl . "ecommerce/checkout/create";
-
-        $response = wp_remote_post($apiUrl, $args);
-        WC()->cart->empty_cart();
-        if (!is_wp_error($response)) {
-            $result = json_decode($response['body'], true);
-            $insertData = [
-                "order_number"       => $order_id,
-                "payment_id"         => $result['paymentId'],
-                "trx_id"             => $result['paymentId'],
-                "transaction_status" => $result['transactionStatus'],
-                "invoice_number"     => $order_id,
-                "amount"             => $amount,
-                "cashbaba_url"       => $result['cashBabaUrl'],
-            ];
-            $this->insertCashBabaPayment($insertData);
-            $order->update_status('processing');
-            return array(
-                'result' => 'success',
-                'redirect' => $result['cashBabaUrl']
-            );
-        } else {
-            wc_add_notice(json_encode($response), 'error');
-            return;
-        }
-    }
-    public function payment_success()
-    {
-        
-        global $wpdb;
-        $variable = $_GET['paymentId'];
-
-        $query = "SELECT * FROM {$wpdb->prefix}{$this->table} where payment_id='{$variable}'";
-
-        $result = $wpdb->get_row($query);
-        
-        $order = wc_get_order($result->order_number);
-        $order->update_status('completed');
-        $order->payment_complete();
-        $order->reduce_order_stock();
-        
-       
-        wp_redirect( $this->get_return_url( $order ) );
-        
-
-        exit;
-       
-        
-    }
-
-    public function payment_failure()
-    {
-
-        global $wpdb;
-        $variable = $_GET['paymentId'];
-
-        $query = "SELECT * FROM {$wpdb->prefix}{$this->table} where payment_id='{$variable}'";
-        $result = $wpdb->get_row($query);
-        $order = wc_get_order($result->order_number);
-        $order->update_status('failed');
-        wp_redirect( $this->get_return_url( $order ) );
-    
-        exit;
-        
 
     }
 
-    private function get_token()
-    {
-        if ($token = get_transient('cashbaba_token')) {
-            return $token;
-        }
 
-        $header = array(
-            'Content-Type' => 'application/x-www-form-urlencoded;charset=UTF-8'
-        );
 
-        $requestBody = array(
-            'grant_type' => "client_credentials",
-            'client_id' => $this->get_option('client_id'),
-            'client_secret' => $this->get_option('client_secret')
-        );
-       
 
-        $args = array(
-            'method' => 'POST',
-            'headers' => $header,
-            'body' => $requestBody,
-        );
-        
-        $tokenUrl = $this->backendApplicationUrl . "connect/token";
-        
 
-        $response = wp_remote_post($tokenUrl, $args);
 
-        if (!is_wp_error($response)) {
-            $result = json_decode($response['body'], true);
-            set_transient('cashbaba_token', $result['access_token'], $result['expires_in']);
-        } else {
-            wc_add_notice(json_encode($response), 'error');
-            return;
-        }
-        return get_transient('cashbaba_token');
-    }
 
-    private function insertCashBabaPayment($paymentInfo)
-    {
-        global $wpdb;
 
-        $insert = $wpdb->insert($wpdb->prefix . $this->table, array(
-            "order_number"       => sanitize_text_field($paymentInfo['order_number']),
-            "payment_id"         => sanitize_text_field($paymentInfo['payment_id']),
-            "trx_id"             => sanitize_text_field($paymentInfo['trx_id']),
-            "transaction_status" => sanitize_text_field($paymentInfo['transaction_status']),
-            "invoice_number"     => sanitize_text_field($paymentInfo['invoice_number']),
-            "amount"             => sanitize_text_field($paymentInfo['amount']),
-        ));
 
-        return $insert;
-    }
+
 }
