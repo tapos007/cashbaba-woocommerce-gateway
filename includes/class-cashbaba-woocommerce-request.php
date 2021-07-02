@@ -80,7 +80,10 @@ class Cashbaba_Wocommerce_Api_Request
             'successcallbackurl' => $this->config['return_url'],
             'failurecallbackurl' => $this->config['return_url'],
             'cancelcallbackurl' => $this->config['return_url'],
-            'RequestDateTime' => date("Y-m-d h:i:s")
+            'RequestDateTime' => date("Y-m-d h:i:s"),
+            'CompanyLogo' => $this->config['company_logo'],
+            'CompanyName' => $this->config['company_name'],
+
         );
 
 

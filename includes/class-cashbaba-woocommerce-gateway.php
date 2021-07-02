@@ -227,6 +227,9 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
             'customer_id' => $isTestEnvironment ? $this->get_option('test_customer_id') : $this->get_option('live_customer_id'),
             'return_url' => $callback,
             'gatewayUrl' => $isTestEnvironment ? self::GATEWAY_SANDBOX_URL : self::GATEWAY_URL,
+            'company_logo' => $this->get_option('test_merchant_id'),
+            'company_name' => $this->get_option('company_name'),
+
 
         );
 

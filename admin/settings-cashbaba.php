@@ -30,6 +30,22 @@ return [
         'default'     => __( 'Pay with your CashBaba Wallet.', 'cashbaba-woocommerce' ),
         'desc_tip'    => true,
     ],
+    'company_logo'                         => [
+        'title'       => __( 'Company Logo', 'cashbaba-woocommerce' ),
+        'type'        => 'text',
+        'description' => __( 'Uplaod data in wordpress media and add url for your company logo', 'cashbaba-woocommerce' ),
+        'default'     => '',
+        'desc_tip'    => true,
+    ],
+    'company_name'                         => [
+        'title'       => __( 'Company Name', 'cashbaba-woocommerce' ),
+        'type'        => 'text',
+        'description' => __( 'Enter your company name.', 'cashbaba-woocommerce' ),
+        'default'     => '',
+        'desc_tip'    => true,
+    ],
+
+
     'testmode'                            => [
         'title'       => __( 'Test mode', 'cashbaba-woocommerce' ),
         'label'       => __( 'Enable Test Mode', 'cashbaba-woocommerce' ),
