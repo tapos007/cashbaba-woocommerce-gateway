@@ -44,18 +44,17 @@ class Cashbaba_Wocommerce_Api_Request
 
         $tokenUrl = $this->config['gatewayUrl'] . "/connect/token";
 
-
-
         $response = wp_remote_post($tokenUrl, $args);
+        $responseCode = wp_remote_retrieve_response_code( $response );
+        $body     = wp_remote_retrieve_body( $response );
 
-        if (!is_wp_error($response)) {
-            $result = json_decode($response['body'], true);
+        if($responseCode !=200){
+            throw new Exception($body);
+        }else{
+            $result = json_decode($body, true);
             set_transient('cashbaba_token', $result['access_token'], $result['expires_in']);
-        } else {
-            wc_add_notice(json_encode($response), 'error');
-            return;
+            return $result['access_token'];
         }
-        return get_transient('cashbaba_token');
     }
 
     public function create_checkout($order_id)
@@ -66,9 +65,6 @@ class Cashbaba_Wocommerce_Api_Request
 
         global $woocommerce;
         $order = new WC_Order($order_id);
-
-
-
         $header = array(
             'Authorization' => "Bearer " . $token,
             'Content-Type' => 'application/json',
@@ -88,7 +84,6 @@ class Cashbaba_Wocommerce_Api_Request
         );
 
 
-        $this->gateway::log(json_encode($requestBody));
 
         $args = array(
             'method' => 'POST',
@@ -96,18 +91,58 @@ class Cashbaba_Wocommerce_Api_Request
             'body' => json_encode($requestBody),
         );
 
-
         $tokenUrl = $this->config['gatewayUrl'] . "/ecommerce/checkout/create";
 
+        $response = wp_remote_post($tokenUrl, $args);
+        $responseCode = wp_remote_retrieve_response_code( $response );
+        $body     = wp_remote_retrieve_body( $response );
+
+
+        if($responseCode !=200){
+            throw new Exception($body);
+        }else{
+            return json_decode($body, true);
+        }
+
+    }
+
+    public function cbInquiry($paymentId,$referenceId,$orderId){
+
+        $token = $this->get_token();
+
+
+        $header = array(
+            'Authorization' => "Bearer " . $token,
+            'Content-Type' => 'application/json',
+        );
+
+        $requestBody = array(
+            'paymentId' => $paymentId,
+            'referenceId' => $referenceId,
+            'orderId' => $orderId,
+        );
 
 
 
+        $args = array(
+            'method' => 'POST',
+            'headers' => $header,
+            'body' => json_encode($requestBody),
+        );
+
+        $tokenUrl = $this->config['gatewayUrl'] . "/ecommerce/checkout/CheckStatus";
 
         $response = wp_remote_post($tokenUrl, $args);
+        $responseCode = wp_remote_retrieve_response_code( $response );
         $body     = wp_remote_retrieve_body( $response );
-        return json_decode($body, true);
 
 
+        if($responseCode !=200){
+            throw new Exception($body);
+        }else{
+            $this->gateway::log(json_encode($body));
+            return json_decode($body, true);
+        }
     }
 
 

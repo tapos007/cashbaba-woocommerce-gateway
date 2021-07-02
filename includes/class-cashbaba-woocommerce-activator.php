@@ -53,12 +53,13 @@ class Cashbaba_Woocommerce_Activator {
 		$sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
                   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
                   `payment_id` varchar(255) DEFAULT NULL,
+                  `reference_id` varchar(255) DEFAULT NULL,
                   `cashbaba_url` varchar(255) DEFAULT NULL,
-                  `trx_id` varchar(255) DEFAULT NULL,
+                  `generate_order_id` varchar(255) DEFAULT NULL,
+                  `original_order_id` varchar(255) DEFAULT NULL,
                   `transaction_status` varchar(255) DEFAULT NULL,
-                  `invoice_number` varchar(255) DEFAULT NULL,
-                  `order_number` varchar(15) DEFAULT NULL,
-                  `amount` float NOT NULL DEFAULT '0',
+                  `transaction_message` varchar(255) DEFAULT NULL,
+                  `processing_code` varchar(100) DEFAULT NULL,
                   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
                   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
                   PRIMARY KEY (`id`)
