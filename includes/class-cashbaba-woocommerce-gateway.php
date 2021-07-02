@@ -62,16 +62,16 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
     {
 
 
-        $response_data = $_POST;
-        if(empty($response_data)){
-            $error = __( 'Invalid CashBaba response: ', 'cashbaba-woocommerce' );
-            wc_add_notice( $error, 'error' );
-            wp_redirect(home_url('/'));
-        }
+//        $response_data = $_POST;
+//        if(empty($response_data)){
+//            $error = __( 'Invalid CashBaba response: ', 'cashbaba-woocommerce' );
+//            wc_add_notice( $error, 'error' );
+//            wp_redirect(home_url('/'));
+//        }
 
-        $generate_order_id = $response_data['orderId'];
-        $payment_id = $response_data['transactionToken'];
-        $reference_id = $response_data['uniqueReferenceNumber'];
+        $generate_order_id = $_POST['orderId'];
+        $payment_id = $_POST['transactionToken'];
+        $reference_id = $_POST['uniqueReferenceNumber'];
 
         if(empty($generate_order_id) || empty($payment_id) || empty($reference_id)){
             $error = __( 'Invalid CashBaba response: ', 'cashbaba-woocommerce' );
@@ -169,7 +169,8 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
         $page = 'admin.php?page=wc-settings&tab=checkout&section=wc_cashbaba#woocommerce_cashbaba_exchange_rate';
         $url = admin_url($page);
 
-        echo '<div class="error"><p>' . sprintf($message, $url, $this->current_currency . '</p></div>'); // WPCS: XSS OK
+        _e('<div class="error"><p>' . sprintf($message, $url, $this->current_currency . '</p></div>'),'cashbaba-woocommerce');
+
     }
 
     /**
@@ -244,8 +245,8 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
      */
     function receipt_page($order_id)
     {
-        echo '<p>' . __('Thank you for your order, please click the button below to pay with CashBaba.', 'alipay') . '</p>';
-        echo $this->generate_cashbaba_form($order_id);
+        _e( '<p>' . __('Thank you for your order, please click the button below to pay with CashBaba.', 'cashbaba-woocommerce') . '</p>','cashbaba-woocommerce');
+        _e($this->generate_cashbaba_form($order_id),'cashbaba-woocommerce');
     }
 
 
