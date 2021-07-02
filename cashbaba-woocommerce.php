@@ -17,8 +17,8 @@
  * Plugin URI:        https://cashbaba.com.bd/
  * Description:       An eCommerce payment method that helps you sell anything. Beautifully.
  * Version:           1.0.0
- * Author:            Biswa Nath Ghosh
- * Author URI:        tapos.pro
+ * Author:            Biswa Nath Ghosh, Sanjib Dhar, Md Sumon Mia
+ * Author URI:        https://learnwithtapos.com
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       cashbaba-woocommerce
