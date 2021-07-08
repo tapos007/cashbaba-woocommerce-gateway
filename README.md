@@ -2,15 +2,8 @@
 
 * [General Description](#user-content-general-description)
 	* [Requirements](#user-content-requirements)
-	* [Overview](#user-content-overview)
 * [Settings](#user-content-settings)
 	* [Gateway settings](#user-content-gateway-settings)
-* [Gateway configuration help](#user-content-gateway-configuration-help)
-	* [Configuration process overview](#user-content-configuration-process-overview)
-	* [Register features, website URL and callback](#user-content-register-features-website-url-and-callback)
-	* [Key management](#user-content-key-management
-	)
-* [Templates](#user-content-templates)
 
 ## General Description
 
