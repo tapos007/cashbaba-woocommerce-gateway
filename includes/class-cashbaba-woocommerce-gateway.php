@@ -69,9 +69,9 @@ class Cashbaba_Wocommerce_Gateway extends WC_Payment_Gateway
 //            wp_redirect(home_url('/'));
 //        }
 
-        $generate_order_id = $_POST['orderId'];
-        $payment_id = $_POST['transactionToken'];
-        $reference_id = $_POST['uniqueReferenceNumber'];
+        $generate_order_id = sanitize_text_field($_POST['orderId']);
+        $payment_id = sanitize_text_field($_POST['transactionToken']);
+        $reference_id = sanitize_text_field($_POST['uniqueReferenceNumber']);
 
         if(empty($generate_order_id) || empty($payment_id) || empty($reference_id)){
             $error = __( 'Invalid CashBaba response: ', 'cashbaba-woocommerce' );

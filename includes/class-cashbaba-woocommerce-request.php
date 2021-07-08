@@ -48,6 +48,7 @@ class Cashbaba_Wocommerce_Api_Request
         $responseCode = wp_remote_retrieve_response_code( $response );
         $body     = wp_remote_retrieve_body( $response );
 
+        $this->gateway::log(json_encode($body));
         if($responseCode !=200){
             throw new Exception($body);
         }else{
@@ -100,6 +101,7 @@ class Cashbaba_Wocommerce_Api_Request
         $responseCode = wp_remote_retrieve_response_code( $response );
         $body     = wp_remote_retrieve_body( $response );
 
+        $this->gateway::log(json_encode($body));
 
         if($responseCode !=200){
             throw new Exception($body);
